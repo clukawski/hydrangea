@@ -1,22 +1,21 @@
-extern crate irc;
-extern crate futures;
-extern crate radix64;
 extern crate failure;
-extern crate serde;
+extern crate futures;
+extern crate irc;
 extern crate pickledb;
+extern crate radix64;
+extern crate serde;
 
-use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
-use std::fmt::{self, Display, Formatter};
-use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
-use irc::client::prelude::*;
 use futures::prelude::*;
+use irc::client::prelude::*;
+use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use radix64::STD;
+use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize, Deserialize)]
 struct Smoker {
     smokes: i32,
-    last: u64
+    last: u64,
 }
 
 const USERNAME: &'static str = "pybot-rs";
@@ -27,7 +26,6 @@ const PASSWORD: &'static str = "";
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
     let channels: Vec<_> = CHANNELS.iter().map(|s| s.to_string()).collect();
-        //let channels = CHANNELS.iter().map(|s: &&str| s.to_owned()).collect::<>();
     let config = Config {
         nickname: Some(USERNAME.to_owned()),
         password: Some(PASSWORD.to_owned()),
@@ -39,15 +37,22 @@ async fn main() -> Result<(), failure::Error> {
     };
 
     // Configure the database
-    let db = PickleDb::load("pybot.db", PickleDbDumpPolicy::AutoDump, SerializationMethod::Json);
+    let db = PickleDb::load(
+        "pybot.db",
+        PickleDbDumpPolicy::AutoDump,
+        SerializationMethod::Json,
+    );
     let mut db = match db {
-		Ok(db) => db,
-		Err(_) => PickleDb::new("pybot.db", PickleDbDumpPolicy::AutoDump, SerializationMethod::Json),
+        Ok(db) => db,
+        Err(_) => PickleDb::new(
+            "pybot.db",
+            PickleDbDumpPolicy::AutoDump,
+            SerializationMethod::Json,
+        ),
     };
 
     let mut client = Client::from_config(config).await?;
     let mut authenticated = false;
-
 
     client.send_cap_ls(NegotiationVersion::V302).unwrap();
     let mut stream = client.stream()?;
@@ -62,7 +67,11 @@ async fn main() -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn authenticate(client: &irc::client::Client, message: &irc::proto::Message, mut authenticated: &bool) -> std::result::Result<(), failure::Error> {
+fn authenticate(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    mut authenticated: &bool,
+) -> std::result::Result<(), failure::Error> {
     if authenticated != &true {
         // Handle CAP LS
         if message.to_string().contains("sasl=PLAIN") {
@@ -84,11 +93,15 @@ fn authenticate(client: &irc::client::Client, message: &irc::proto::Message, mut
     Ok(())
 }
 
-fn abuse(client: &irc::client::Client, message: &irc::proto::Message) -> std::result::Result<(), failure::Error> {
+fn abuse(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let splitstring = format!("PRIVMSG {} :abuse", channel);
     let pybotstring = format!("PRIVMSG {} :pybot-rs", channel);
-    let evan = message.to_string().contains(":abuse daddy") || message.to_string().contains(":abuse evan");
+    let evan =
+        message.to_string().contains(":abuse daddy") || message.to_string().contains(":abuse evan");
     let vivi = message.to_string().contains(":abuse vivi");
     let pybot = message.to_string().contains(&pybotstring);
     let msgstr = message.to_string();
@@ -96,7 +109,9 @@ fn abuse(client: &irc::client::Client, message: &irc::proto::Message) -> std::re
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
         let username = splitmsg[1];
         let trimmed = username.trim();
-        client.send_privmsg(channel, format!("{} loves c++", trimmed)).unwrap();
+        client
+            .send_privmsg(channel, format!("{} loves c++", trimmed))
+            .unwrap();
     }
     if vivi {
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
@@ -117,7 +132,11 @@ fn abuse(client: &irc::client::Client, message: &irc::proto::Message) -> std::re
     Ok(())
 }
 
-fn smoke(client: &irc::client::Client, message: &irc::proto::Message, db: &mut PickleDb) -> std::result::Result<(), failure::Error> {
+fn smoke(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let splitstring = format!("PRIVMSG {} smoke", channel);
     if message.to_string().contains(&splitstring) {
@@ -125,14 +144,23 @@ fn smoke(client: &irc::client::Client, message: &irc::proto::Message, db: &mut P
         let splitmsg: Vec<&str> = msgstr.split("!").collect();
         let username = splitmsg[0].trim_start_matches(":");
         if db.get::<Smoker>(&username).is_none() {
-            let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-            let new_smoker = Smoker {smokes: 1, last: epoch };
+            let epoch = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            let new_smoker = Smoker {
+                smokes: 1,
+                last: epoch,
+            };
             db.set(&username, &new_smoker).unwrap();
             client.send_privmsg(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", new_smoker.smokes, username, new_smoker.smokes, "s"))?;
         } else {
-            let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            let epoch = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
             let mut smoker = db.get::<Smoker>(&username).unwrap();
-            smoker.smokes = smoker.smokes+1;
+            smoker.smokes = smoker.smokes + 1;
             smoker.last = epoch;
             db.set(&username, &smoker).unwrap();
             client.send_privmsg(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", smoker.smokes, username, smoker.smokes, "s"))?;
@@ -145,7 +173,7 @@ fn smoke(client: &irc::client::Client, message: &irc::proto::Message, db: &mut P
 fn get_channel(message: &irc::proto::Message) -> &str {
     for channel in CHANNELS.iter() {
         if message.to_string().contains(channel) {
-            return channel
+            return channel;
         }
     }
     ""
