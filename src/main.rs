@@ -38,30 +38,16 @@ async fn main() -> Result<(), failure::Error> {
         ..Config::default()
     };
 
-    // create a new DB with AutoDum, meaning every change is written to the file,
-    // and with Json serialization
-    let mut db: PickleDb;
-    if PickleDb::load(
-        "pybot.db",
-        PickleDbDumpPolicy::AutoDump,
-        SerializationMethod::Json,
-    ).is_err() {
-        let mut db = PickleDb::new(
-            "pybot.db",
-            PickleDbDumpPolicy::AutoDump,
-            SerializationMethod::Json,
-        );
-    }
-    let mut db = PickleDb::load(
-        "pybot.db",
-        PickleDbDumpPolicy::AutoDump,
-        SerializationMethod::Json,
-    ).unwrap();
+    // Configure the database
+    let db = PickleDb::load("pybot.db", PickleDbDumpPolicy::AutoDump, SerializationMethod::Json);
+    let mut db = match db {
+		Ok(db) => db,
+		Err(_) => PickleDb::new("pybot.db", PickleDbDumpPolicy::AutoDump, SerializationMethod::Json),
+    };
 
     let mut client = Client::from_config(config).await?;
     let mut authenticated = false;
 
-    // Configure the database
 
     client.send_cap_ls(NegotiationVersion::V302).unwrap();
     let mut stream = client.stream()?;
