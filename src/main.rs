@@ -102,6 +102,7 @@ fn abuse(
     let pybotstring = format!("PRIVMSG {} :pybot-rs", channel);
     let evan =
         message.to_string().contains(":abuse daddy") || message.to_string().contains(":abuse evan");
+    let shivaram = message.to_string().contains(":abuse shivaram");
     let vivi = message.to_string().contains(":abuse vivi");
     let pybot = message.to_string().contains(&pybotstring);
     let msgstr = message.to_string();
@@ -110,7 +111,7 @@ fn abuse(
         let username = splitmsg[1];
         let trimmed = username.trim();
         client
-            .send_privmsg(channel, format!("{} loves c++", trimmed))
+            .send_privmsg(channel, format!("{} loves rust", trimmed))
             .unwrap();
     }
     if vivi {
@@ -119,10 +120,18 @@ fn abuse(
         let trimmed = username.trim();
         client.send_privmsg(channel, format!("{} is planning on becoming a front end developer because he loves JavaScript so much", trimmed)).unwrap();
     }
+    if shivaram {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(channel, format!("{} loves plan 9 C", trimmed))
+            .unwrap();
+    }
     if pybot {
         client.send_privmsg(channel, "sux to suck, luser").unwrap();
     }
-    if message.to_string().contains(":abuse") && !evan && !vivi && !pybot {
+    if message.to_string().contains(":abuse") && !evan && !vivi && !pybot && !shivaram {
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
         let username = splitmsg[1];
         let trimmed = username.trim();
