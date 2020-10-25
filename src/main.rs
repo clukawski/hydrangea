@@ -25,17 +25,6 @@ const PASSWORD: &'static str = "";
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
-    let channels: Vec<_> = CHANNELS.iter().map(|s| s.to_string()).collect();
-    let config = Config {
-        nickname: Some(USERNAME.to_owned()),
-        password: Some(PASSWORD.to_owned()),
-        use_tls: Some(true),
-        server: Some(NETWORK.to_owned()),
-        channels: channels,
-        port: Some(6697),
-        ..Config::default()
-    };
-
     // Configure the database
     let db = PickleDb::load(
         "pybot.db",
@@ -50,20 +39,40 @@ async fn main() -> Result<(), failure::Error> {
             SerializationMethod::Json,
         ),
     };
+    let mut retry_count = 999;
+    loop {
+        let channels: Vec<_> = CHANNELS.iter().map(|s| s.to_string()).collect();
+        let config = Config {
+            nickname: Some(USERNAME.to_owned()),
+            password: Some(PASSWORD.to_owned()),
+            use_tls: Some(true),
+            server: Some(NETWORK.to_owned()),
+            channels: channels,
+            port: Some(6697),
+            ..Config::default()
+        };
 
-    let mut client = Client::from_config(config).await?;
-    let mut authenticated = false;
+        let mut client = Client::from_config(config).await?;
+        let mut authenticated = false;
 
-    client.send_cap_ls(NegotiationVersion::V302).unwrap();
-    let mut stream = client.stream()?;
+        client.send_cap_ls(NegotiationVersion::V302).unwrap();
+        let mut stream = client.stream()?;
 
-    while let Some(message) = stream.next().await.transpose()? {
-        print!("{}", message);
-        authenticate(&client, &message, &mut authenticated)?;
-        abuse(&client, &message)?;
-        smoke(&client, &message, &mut db)?;
+        while let Some(message) = stream.next().await.transpose()? {
+            print!("{}", message);
+            if message.to_string().contains("KICK #") && message.to_string().contains("pybot-rs") {
+                client.send_quit(format!("GOODBYE FOREVER"))?;
+                break;
+            }
+            authenticate(&client, &message, &mut authenticated)?;
+            abuse(&client, &message)?;
+            smoke(&client, &message, &mut db)?;
+        }
+        retry_count = retry_count - 1;
+        if retry_count == 0 {
+            break;
+        }
     }
-
     Ok(())
 }
 
