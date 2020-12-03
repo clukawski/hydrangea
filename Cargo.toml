@@ -16,6 +16,7 @@ serde = "1.0.106"
 pickledb = "0.4.1"
 rand = "0.7.3"
 openssl-sys = "*"
+linkify = "0.4.0"
 
 [features]
 vendored = ["openssl-sys/vendored"]
