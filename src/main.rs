@@ -129,6 +129,7 @@ fn abuse(
     let wrmsr = message.to_string().contains(":abuse wrmsr");
     let ed = message.to_string().contains(":abuse ed");
     let carmen = message.to_string().contains(":abuse carmen");
+    let garrick = message.to_string().contains(":abuse garrick");
     let pybot = message.to_string().contains(&pybotstring);
     let msgstr = message.to_string();
 
@@ -208,6 +209,17 @@ fn abuse(
             .send_privmsg(channel, format!("\x0375{} loves android\x03", trimmed))
             .unwrap();
     }
+    if garrick {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(
+                channel,
+                format!("{} loves mutability and keeping state", trimmed),
+            )
+            .unwrap();
+    }
     if message.to_string().contains(":abuse")
         && !evan
         && !vivi
@@ -217,6 +229,7 @@ fn abuse(
         && !wrmsr
         && !ed
         && !carmen
+        && !garrick
     {
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
         let username = splitmsg[1];
