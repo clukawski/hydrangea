@@ -17,10 +17,10 @@ use irc::client::prelude::*;
 use linkify::LinkFinder;
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use radix64::STD;
-use rand::seq::IteratorRandom; // 0.7.3
+use rand::seq::IteratorRandom;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Map;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
