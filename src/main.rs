@@ -1,19 +1,26 @@
 extern crate failure;
 extern crate futures;
+extern crate handlebars;
 extern crate irc;
 extern crate linkify;
 extern crate pickledb;
 extern crate radix64;
 extern crate rand;
 extern crate serde;
+#[macro_use]
+extern crate serde_json;
+extern crate regex;
 
 use futures::prelude::*;
+use handlebars::Handlebars;
 use irc::client::prelude::*;
 use linkify::LinkFinder;
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use radix64::STD;
 use rand::seq::IteratorRandom; // 0.7.3
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
@@ -75,10 +82,13 @@ async fn main() -> Result<(), failure::Error> {
                 break;
             }
             authenticate(&client, &message, &mut authenticated)?;
-            abuse(&client, &message)?;
+            abuse2(&client, &message)?;
             smoke(&client, &message, &mut db)?;
             // link(&message)?;
+            mktpl(&client, &message, &mut db)?;
+            mkword(&client, &message, &mut db)?;
             theo(&client, &message)?;
+            abuse(&client, &message, &mut db);
         }
         retry_count = retry_count - 1;
         if retry_count == 0 {
@@ -114,22 +124,22 @@ fn authenticate(
     Ok(())
 }
 
-fn abuse(
+fn abuse2(
     client: &irc::client::Client,
     message: &irc::proto::Message,
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
-    let splitstring = format!("PRIVMSG {} :abuse", channel);
+    let splitstring = format!("PRIVMSG {} :abuse_old", channel);
     let pybotstring = format!("PRIVMSG {} :pybot-rs", channel);
-    let evan =
-        message.to_string().contains(":abuse daddy") || message.to_string().contains(":abuse evan");
-    let shivaram = message.to_string().contains(":abuse shivaram");
-    let vivi = message.to_string().contains(":abuse vivi");
-    let comradeblue = message.to_string().contains(":abuse comradeblue");
-    let wrmsr = message.to_string().contains(":abuse wrmsr");
-    let ed = message.to_string().contains(":abuse ed");
-    let carmen = message.to_string().contains(":abuse carmen");
-    let garrick = message.to_string().contains(":abuse garrick");
+    let evan = message.to_string().contains(":abuse_old daddy")
+        || message.to_string().contains(":abuse_old evan");
+    let shivaram = message.to_string().contains(":abuse_old shivaram");
+    let vivi = message.to_string().contains(":abuse_old vivi");
+    let comradeblue = message.to_string().contains(":abuse_old comradeblue");
+    let wrmsr = message.to_string().contains(":abuse_old wrmsr");
+    let ed = message.to_string().contains(":abuse_old ed");
+    let carmen = message.to_string().contains(":abuse_old carmen");
+    let garrick = message.to_string().contains(":abuse_old garrick");
     let pybot = message.to_string().contains(&pybotstring);
     let msgstr = message.to_string();
 
@@ -220,7 +230,7 @@ fn abuse(
             )
             .unwrap();
     }
-    if message.to_string().contains(":abuse")
+    if message.to_string().contains(":abuse_old")
         && !evan
         && !vivi
         && !pybot
@@ -284,7 +294,6 @@ fn theo(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let theo_pattern = format!("PRIVMSG {} theo", channel);
-    println!("{}", theo_pattern);
     let theo = message.to_string().contains(&theo_pattern.to_string());
 
     if theo {
@@ -323,4 +332,107 @@ fn find_theo() -> String {
     lines
         .choose(&mut rand::thread_rng())
         .expect("File had no lines")
+}
+
+fn mktpl(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let mktpl_pattern = format!("PRIVMSG {} :mktpl ", channel);
+    let is_mktpl = message.to_string().contains(&mktpl_pattern.to_string());
+
+    if is_mktpl {
+        let msgstr = message.to_string();
+        let mktpl_cmd: Vec<&str> = msgstr.split(&mktpl_pattern).collect();
+        if !db.lexists("tpl") {
+            db.lcreate("tpl")?;
+        }
+        db.ladd("tpl", &mktpl_cmd[1].trim()).unwrap();
+        client.send_privmsg(channel, format!("mktpl added: {}", mktpl_cmd[1]))?;
+    }
+
+    Ok(())
+}
+
+fn mkword(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    // TODO: mkword and mktpl are basically the sasame fn
+    let channel = get_channel(message);
+    let mkword_pattern = format!("PRIVMSG {} :mkword ", channel);
+    let is_mkword = message.to_string().contains(&mkword_pattern.to_string());
+
+    if is_mkword {
+        let msgstr = message.to_string();
+        let mkword_cmd: Vec<&str> = msgstr.split(&mkword_pattern).collect();
+        let mkword_kv: Vec<&str> = mkword_cmd[1].split(" ").collect();
+        if !db.lexists(&mkword_kv[0]) {
+            db.lcreate(&mkword_kv[0])?;
+        }
+        db.ladd(&mkword_kv[0], &mkword_kv[1].trim()).unwrap();
+        client.send_privmsg(
+            channel,
+            format!("mkword added: {}:{}", mkword_kv[0], mkword_kv[1]),
+        )?;
+    }
+
+    Ok(())
+}
+
+fn abuse(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let abuse_pattern = format!("PRIVMSG {} :abuse ", channel);
+    let is_abuse = message.to_string().contains(&abuse_pattern.to_string());
+
+    if is_abuse {
+        let msgstr = message.to_string();
+        let abuse_cmd: Vec<&str> = msgstr.split(&abuse_pattern).collect();
+        let name = abuse_cmd[1].trim();
+
+        let tp_db_len = db.llen("tpl");
+        if tp_db_len > 0 {
+            let tpl_list = db.liter("tpl");
+            let tpl = tpl_list.choose(&mut rand::thread_rng()).unwrap();
+            let tpl_string = tpl.get_item::<String>().unwrap();
+
+            let re = Regex::new(r"([{][{][a-zA-Z]+[}][}])+").unwrap();
+            let matches = re.find_iter(&tpl_string);
+            let mut replacements = Map::new();
+            replacements.insert("name".to_string(), name.into());
+
+            for m in matches {
+                let word_type = m.as_str().trim_matches(|c| c == '{' || c == '}');
+                if word_type.contains("name") {
+                    continue;
+                }
+                let word_replace = db
+                    .liter(word_type)
+                    .choose(&mut rand::thread_rng())
+                    .unwrap()
+                    .get_item::<String>()
+                    .unwrap();
+
+                replacements.insert(word_type.to_owned(), word_replace.into());
+            }
+
+            let reg = Handlebars::new();
+            client.send_privmsg(
+                channel,
+                format!(
+                    "{}",
+                    reg.render_template(&tpl_string, &json!(replacements))?
+                ),
+            )?;
+        }
+    }
+
+    Ok(())
 }
