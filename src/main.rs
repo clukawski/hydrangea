@@ -552,7 +552,7 @@ fn abuse(
 
     if is_abuse {
         let msgstr = message.to_string();
-        let abuse_cmd: Vec<&str> = msgstr.split(&abuse_pattern).collect();
+        let abuse_cmd: Vec<&str> = msgstr.trim().split(&abuse_pattern).collect();
         let abuse_args: Vec<&str> = abuse_cmd[1].split(" ").collect();
         let name = abuse_args[0].trim();
         let mut tpl_num = 0;
