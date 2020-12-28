@@ -477,16 +477,26 @@ fn abuse(
         let abuse_cmd: Vec<&str> = msgstr.split(&abuse_pattern).collect();
         let abuse_args: Vec<&str> = abuse_cmd[1].split(" ").collect();
         let name = abuse_args[0];
-        // let mut
-        // if abuse_args.len() > 1 {
-        // }
-        // let tpl_num = abuse_cmd[1].trim();
+        let mut tpl_num = 0;
+        let mut tpl_set = false;
+        if abuse_args.len() > 1 {
+            tpl_set = true;
+            tpl_num = abuse_args[1].trim().parse::<usize>()?;
+        }
 
         let tp_db_len = db.llen("tpl");
         if tp_db_len > 0 {
-            let tpl_list = db.liter("tpl");
-            let tpl = tpl_list.choose(&mut rand::thread_rng()).unwrap();
-            let tpl_string = tpl.get_item::<String>().unwrap();
+            let tpl_string = {
+                let tpl_string: String;
+                if tpl_set {
+                    tpl_string = db.lget::<String>("tpl", tpl_num).unwrap();
+                } else {
+                    let tpl_list = db.liter("tpl");
+                    let item = tpl_list.choose(&mut rand::thread_rng()).unwrap();
+                    tpl_string = item.get_item::<String>().unwrap();
+                }
+                tpl_string
+            };
 
             let re = Regex::new(r"([{][{][a-zA-Z]+[}][}])+").unwrap();
             let matches = re.find_iter(&tpl_string);
