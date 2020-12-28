@@ -56,7 +56,8 @@ async fn main() -> Result<(), failure::Error> {
             SerializationMethod::Json,
         ),
     };
-    let mut retry_count = 999;
+
+    let mut retry_count: i32 = 999;
     loop {
         let channels: Vec<_> = CHANNELS.iter().map(|s| s.to_string()).collect();
         let config = Config {
@@ -81,17 +82,14 @@ async fn main() -> Result<(), failure::Error> {
                 client.send_quit(format!("GOODBYE FOREVER"))?;
                 break;
             }
-            authenticate(&client, &message, &mut authenticated)?;
-            abuse2(&client, &message)?;
-            smoke(&client, &message, &mut db)?;
-            // link(&message)?;
-            mktpl(&client, &message, &mut db)?;
-            mkword(&client, &message, &mut db)?;
-            lstpl(&client, &message, &mut db)?;
-            rmtpl(&client, &message, &mut db)?;
 
-            theo(&client, &message)?;
-            abuse(&client, &message, &mut db);
+            if let Err(auth_result) = authenticate(&client, &message, &mut authenticated) {
+                eprintln!("{:?}", auth_result);
+            }
+
+            if let Err(message_result) = handle_message(&client, &message, &mut db) {
+                eprintln!("{:?}", message_result);
+            }
         }
 
         retry_count = retry_count - 1;
@@ -99,6 +97,24 @@ async fn main() -> Result<(), failure::Error> {
             break;
         }
     }
+    Ok(())
+}
+
+fn handle_message(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    mut db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    abuse2(&client, &message)?;
+    smoke(&client, &message, &mut db)?;
+    // link(&message)?;
+    mktpl(&client, &message, &mut db)?;
+    mkword(&client, &message, &mut db)?;
+    lstpl(&client, &message, &mut db)?;
+    rmtpl(&client, &message, &mut db)?;
+
+    theo(&client, &message)?;
+    abuse(&client, &message, &mut db)?;
     Ok(())
 }
 
@@ -420,7 +436,7 @@ fn mkword(
     message: &irc::proto::Message,
     db: &mut PickleDb,
 ) -> std::result::Result<(), failure::Error> {
-    // TODO: mkword and mktpl are basically the sasame fn
+    // TODO: mkword and mktpl are basically the same fn
     let channel = get_channel(message);
     let mkword_pattern = format!("PRIVMSG {} :mkword ", channel);
     let is_mkword = message.to_string().contains(&mkword_pattern.to_string());
@@ -454,7 +470,12 @@ fn abuse(
     if is_abuse {
         let msgstr = message.to_string();
         let abuse_cmd: Vec<&str> = msgstr.split(&abuse_pattern).collect();
-        let name = abuse_cmd[1].trim();
+        let abuse_args: Vec<&str> = abuse_cmd[1].split(" ").collect();
+        let name = abuse_args[0];
+        // let mut
+        // if abuse_args.len() > 1 {
+        // }
+        // let tpl_num = abuse_cmd[1].trim();
 
         let tp_db_len = db.llen("tpl");
         if tp_db_len > 0 {
