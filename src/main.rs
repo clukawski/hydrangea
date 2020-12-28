@@ -114,6 +114,7 @@ fn handle_message(
     rmword(&client, &message, &mut db)?;
     lstpl(&client, &message, &mut db)?;
     rmtpl(&client, &message, &mut db)?;
+    showtpl(&client, &message, &mut db)?;
 
     theo(&client, &message)?;
     abuse(&client, &message, &mut db)?;
@@ -382,6 +383,32 @@ fn mktpl(
     Ok(())
 }
 
+// fn lstpl(
+//     client: &irc::client::Client,
+//     message: &irc::proto::Message,
+//     db: &mut PickleDb,
+// ) -> std::result::Result<(), failure::Error> {
+//     let channel = get_channel(message);
+//     let lstpl_pattern = format!("PRIVMSG {} lstpl", channel);
+//     let is_lstpl = message.to_string().contains(&lstpl_pattern.to_string());
+
+//     if is_lstpl {
+//         let tpl_db_len = db.llen("tpl");
+//         if tpl_db_len > 0 {
+//             let nickname = message.source_nickname().unwrap();
+//             let mut tpl_count = 0;
+//             let tpl_list = db.liter("tpl");
+//             for tpl in tpl_list {
+//                 let tpl_string = tpl.get_item::<String>().unwrap();
+//                 client.send_privmsg(nickname, format!("lstpl: {}:{}", tpl_count, tpl_string))?;
+//                 tpl_count += 1;
+//             }
+//         }
+//     }
+
+//     Ok(())
+// }
+
 fn lstpl(
     client: &irc::client::Client,
     message: &irc::proto::Message,
@@ -392,16 +419,34 @@ fn lstpl(
     let is_lstpl = message.to_string().contains(&lstpl_pattern.to_string());
 
     if is_lstpl {
-        let tp_db_len = db.llen("tpl");
-        if tp_db_len > 0 {
-            let nickname = message.source_nickname().unwrap();
-            let mut tpl_count = 0;
-            let tpl_list = db.liter("tpl");
-            for tpl in tpl_list {
-                let tpl_string = tpl.get_item::<String>().unwrap();
-                client.send_privmsg(nickname, format!("lstpl: {}:{}", tpl_count, tpl_string))?;
-                tpl_count += 1;
-            }
+        let tpl_db_len = db.llen("tpl");
+        client.send_privmsg(
+            channel,
+            format!("lstpl: {} templates (zero indexed)", tpl_db_len),
+        )?;
+    }
+
+    Ok(())
+}
+
+fn showtpl(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let msgstr = message.to_string();
+    let showtpl_pattern = format!("PRIVMSG {} :showtpl ", channel);
+    let is_showtpl = message.to_string().contains(&showtpl_pattern.to_string());
+
+    if is_showtpl {
+        let showtpl_cmd: Vec<&str> = msgstr.split(&showtpl_pattern).collect();
+        let tpl_num = showtpl_cmd[1].trim().parse::<usize>()?;
+        let tpl_db_len = db.llen("tpl");
+
+        if tpl_db_len > 0 {
+            let tpl_string = db.lget::<String>("tpl", tpl_num).unwrap();
+            client.send_privmsg(channel, format!("showtpl: {}:{}", tpl_num, tpl_string))?;
         }
     }
 
