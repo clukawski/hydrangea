@@ -583,17 +583,20 @@ fn abuse(
 
             for m in matches {
                 let word_type = m.as_str().trim_matches(|c| c == '{' || c == '}');
-                if word_type.contains("name") {
+                if word_type == "name" {
                     continue;
                 }
-                let word_replace = db
-                    .liter(word_type)
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .get_item::<String>()
-                    .unwrap();
 
-                replacements.insert(word_type.to_owned(), word_replace.into());
+                if db.lexists(word_type) && db.llen(word_type) > 0 {
+                    let word_replace = db
+                        .liter(word_type)
+                        .choose(&mut rand::thread_rng())
+                        .unwrap()
+                        .get_item::<String>()
+                        .unwrap();
+
+                    replacements.insert(word_type.to_owned(), word_replace.into());
+                }
             }
 
             let reg = Handlebars::new();
