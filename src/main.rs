@@ -596,6 +596,9 @@ fn abuse(
                         .unwrap();
 
                     replacements.insert(word_type.to_owned(), word_replace.into());
+                } else {
+                    let word_type_err = format!("[missing: {}]", word_type);
+                    replacements.insert(word_type.to_owned(), word_type_err.into());
                 }
             }
 
