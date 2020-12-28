@@ -532,10 +532,13 @@ fn rmword(
             return Err(format_err!("rmword: invalid arguments"));
         }
 
-        db.lrem_value::<String>(rmword_args[0], &rmword_args[1].to_owned())
+        db.lrem_value::<String>(rmword_args[0], &rmword_args[1..].join(" ").to_owned())
             .unwrap();
 
-        client.send_privmsg(channel, format!("rmword: {}", rmword_cmd[1]))?;
+        client.send_privmsg(
+            channel,
+            format!("rmword: {}:{}", rmword_args[0], rmword_args[1..].join("")),
+        )?;
     }
 
     Ok(())
