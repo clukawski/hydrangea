@@ -11,6 +11,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate regex;
 
+use failure::format_err;
 use futures::prelude::*;
 use handlebars::Handlebars;
 use irc::client::prelude::*;
@@ -110,6 +111,7 @@ fn handle_message(
     // link(&message)?;
     mktpl(&client, &message, &mut db)?;
     mkword(&client, &message, &mut db)?;
+    rmword(&client, &message, &mut db)?;
     lstpl(&client, &message, &mut db)?;
     rmtpl(&client, &message, &mut db)?;
 
@@ -458,6 +460,37 @@ fn mkword(
                 mkword_kv[1..].join(" ").trim()
             ),
         )?;
+    }
+
+    Ok(())
+}
+
+fn rmword(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let rmword_pattern = format!("PRIVMSG {} :rmword ", channel);
+    let is_rmword = message.to_string().contains(&rmword_pattern.to_string());
+    if is_rmword {
+        let msgstr = message.to_string();
+        let rmword_cmd: Vec<&str> = msgstr.split(&rmword_pattern).collect();
+        let rmword_args: Vec<&str> = rmword_cmd[1].split(" ").collect();
+
+        if !db.lexists(rmword_args[0]) {
+            return Ok(());
+        }
+
+        if rmword_args.len() < 2 {
+            client.send_privmsg(channel, format!("rmword: invalid_arguments"))?;
+            return Err(format_err!("rmword: invalid arguments"));
+        }
+
+        db.lrem_value::<String>(rmword_args[0], &rmword_args[1].to_owned())
+            .unwrap();
+
+        client.send_privmsg(channel, format!("rmword: {}", rmword_cmd[1]))?;
     }
 
     Ok(())
