@@ -448,10 +448,15 @@ fn mkword(
         if !db.lexists(&mkword_kv[0]) {
             db.lcreate(&mkword_kv[0])?;
         }
-        db.ladd(&mkword_kv[0], &mkword_kv[1].trim()).unwrap();
+        db.ladd(&mkword_kv[0], &mkword_kv[1..].join(" ").trim())
+            .unwrap();
         client.send_privmsg(
             channel,
-            format!("mkword added: {}:{}", mkword_kv[0], mkword_kv[1]),
+            format!(
+                "mkword added: {}:{}",
+                mkword_kv[0],
+                mkword_kv[1..].join(" ").trim()
+            ),
         )?;
     }
 
