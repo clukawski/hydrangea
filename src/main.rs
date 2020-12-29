@@ -445,7 +445,12 @@ fn showtpl(
         let tpl_db_len = db.llen("tpl");
 
         if tpl_db_len > 0 {
-            let tpl_string = db.lget::<String>("tpl", tpl_num).unwrap();
+            let tpl_string: String;
+            if let Some(tpl) = db.lget::<String>("tpl", tpl_num) {
+                tpl_string = tpl;
+            } else {
+                tpl_string = "that template doesn't exist you dipshit".to_owned();
+            }
             client.send_privmsg(channel, format!("showtpl: {}:{}", tpl_num, tpl_string))?;
         }
     }
