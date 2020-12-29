@@ -106,7 +106,7 @@ fn handle_message(
     message: &irc::proto::Message,
     mut db: &mut PickleDb,
 ) -> std::result::Result<(), failure::Error> {
-    abuse2(&client, &message)?;
+    abuse_old(&client, &message)?;
     smoke(&client, &message, &mut db)?;
     // link(&message)?;
     mktpl(&client, &message, &mut db)?;
@@ -142,132 +142,6 @@ fn authenticate(
             authenticated = &true;
             client.identify()?;
         }
-    }
-
-    Ok(())
-}
-
-fn abuse2(
-    client: &irc::client::Client,
-    message: &irc::proto::Message,
-) -> std::result::Result<(), failure::Error> {
-    let channel = get_channel(message);
-    let splitstring = format!("PRIVMSG {} :abuse_old", channel);
-    let pybotstring = format!("PRIVMSG {} :pybot-rs", channel);
-    let evan = message.to_string().contains(":abuse_old daddy")
-        || message.to_string().contains(":abuse_old evan");
-    let shivaram = message.to_string().contains(":abuse_old shivaram");
-    let vivi = message.to_string().contains(":abuse_old vivi");
-    let comradeblue = message.to_string().contains(":abuse_old comradeblue");
-    let wrmsr = message.to_string().contains(":abuse_old wrmsr");
-    let ed = message.to_string().contains(":abuse_old ed");
-    let carmen = message.to_string().contains(":abuse_old carmen");
-    let garrick = message.to_string().contains(":abuse_old garrick");
-    let pybot = message.to_string().contains(&pybotstring);
-    let msgstr = message.to_string();
-
-    let mut abuse_presets = HashMap::new();
-    abuse_presets.insert(String::from("evan"), String::from("evan"));
-
-    if evan {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client
-            .send_privmsg(channel, format!("{} loves rust", trimmed))
-            .unwrap();
-    }
-    if vivi {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client.send_privmsg(channel, format!("{} is planning on becoming a front end developer because he loves JavaScript so much", trimmed)).unwrap();
-    }
-    if shivaram {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-
-        if rand::random() {
-            client
-                .send_privmsg(channel, format!("{} loves plan 9 C", trimmed))
-                .unwrap();
-        } else {
-            client
-                .send_privmsg(
-                    channel,
-                    format!(
-                        "{} doesn't believe in the importance of american military hegemony",
-                        trimmed
-                    ),
-                )
-                .unwrap();
-        }
-    }
-    if comradeblue {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client
-            .send_privmsg(channel, format!("{} isn't a real programmer", trimmed))
-            .unwrap();
-    }
-    if wrmsr {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client
-            .send_privmsg(channel, format!("{} #1 nancy pelosi fan", trimmed))
-            .unwrap();
-    }
-    if ed {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client
-            .send_privmsg(
-                channel,
-                format!("\x0352{}: ARE THOSE FEATURES DONE YET??? HOW ARE YOUR OKRs LOOKING? Look, we're going to need you to stack rank your team mmmmmmkayyy?\x03", trimmed),
-            )
-            .unwrap();
-    }
-    if pybot {
-        client.send_privmsg(channel, "sux to suck, luser").unwrap();
-    }
-    if carmen {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client
-            .send_privmsg(channel, format!("\x0375{} loves android\x03", trimmed))
-            .unwrap();
-    }
-    if garrick {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client
-            .send_privmsg(
-                channel,
-                format!("{} loves mutability and keeping state", trimmed),
-            )
-            .unwrap();
-    }
-    if message.to_string().contains(":abuse_old")
-        && !evan
-        && !vivi
-        && !pybot
-        && !shivaram
-        && !comradeblue
-        && !wrmsr
-        && !ed
-        && !carmen
-        && !garrick
-    {
-        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
-        let username = splitmsg[1];
-        let trimmed = username.trim();
-        client.send_privmsg(channel, format!("{} loves JavaScript", trimmed))?;
     }
 
     Ok(())
@@ -598,7 +472,8 @@ fn abuse(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let abuse_pattern = format!("PRIVMSG {} :abuse ", channel);
-    let is_abuse = message.to_string().contains(&abuse_pattern.to_string());
+    let is_abuse = message.to_string().contains(&abuse_pattern.to_string())
+        && !message.to_string().trim().ends_with(":abuse");
 
     if is_abuse {
         let msgstr = message.to_string();
@@ -659,7 +534,8 @@ fn abuse(
                 }
             }
 
-            let reg = Handlebars::new();
+            let mut reg = Handlebars::new();
+            reg.register_escape_fn(handlebars::no_escape);
             client.send_privmsg(
                 channel,
                 format!(
@@ -668,6 +544,132 @@ fn abuse(
                 ),
             )?;
         }
+    }
+
+    Ok(())
+}
+
+fn abuse_old(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let splitstring = format!("PRIVMSG {} :abuse_old", channel);
+    let pybotstring = format!("PRIVMSG {} :pybot-rs", channel);
+    let evan = message.to_string().contains(":abuse_old daddy")
+        || message.to_string().contains(":abuse_old evan");
+    let shivaram = message.to_string().contains(":abuse_old shivaram");
+    let vivi = message.to_string().contains(":abuse_old vivi");
+    let comradeblue = message.to_string().contains(":abuse_old comradeblue");
+    let wrmsr = message.to_string().contains(":abuse_old wrmsr");
+    let ed = message.to_string().contains(":abuse_old ed");
+    let carmen = message.to_string().contains(":abuse_old carmen");
+    let garrick = message.to_string().contains(":abuse_old garrick");
+    let pybot = message.to_string().contains(&pybotstring);
+    let msgstr = message.to_string();
+
+    let mut abuse_presets = HashMap::new();
+    abuse_presets.insert(String::from("evan"), String::from("evan"));
+
+    if evan {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(channel, format!("{} loves rust", trimmed))
+            .unwrap();
+    }
+    if vivi {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client.send_privmsg(channel, format!("{} is planning on becoming a front end developer because he loves JavaScript so much", trimmed)).unwrap();
+    }
+    if shivaram {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+
+        if rand::random() {
+            client
+                .send_privmsg(channel, format!("{} loves plan 9 C", trimmed))
+                .unwrap();
+        } else {
+            client
+                .send_privmsg(
+                    channel,
+                    format!(
+                        "{} doesn't believe in the importance of american military hegemony",
+                        trimmed
+                    ),
+                )
+                .unwrap();
+        }
+    }
+    if comradeblue {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(channel, format!("{} isn't a real programmer", trimmed))
+            .unwrap();
+    }
+    if wrmsr {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(channel, format!("{} #1 nancy pelosi fan", trimmed))
+            .unwrap();
+    }
+    if ed {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(
+                channel,
+                format!("\x0352{}: ARE THOSE FEATURES DONE YET??? HOW ARE YOUR OKRs LOOKING? Look, we're going to need you to stack rank your team mmmmmmkayyy?\x03", trimmed),
+            )
+            .unwrap();
+    }
+    if pybot {
+        client.send_privmsg(channel, "sux to suck, luser").unwrap();
+    }
+    if carmen {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(channel, format!("\x0375{} loves android\x03", trimmed))
+            .unwrap();
+    }
+    if garrick {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client
+            .send_privmsg(
+                channel,
+                format!("{} loves mutability and keeping state", trimmed),
+            )
+            .unwrap();
+    }
+    if message.to_string().contains(":abuse_old")
+        && !evan
+        && !vivi
+        && !pybot
+        && !shivaram
+        && !comradeblue
+        && !wrmsr
+        && !ed
+        && !carmen
+        && !garrick
+    {
+        let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
+        let username = splitmsg[1];
+        let trimmed = username.trim();
+        client.send_privmsg(channel, format!("{} loves JavaScript", trimmed))?;
     }
 
     Ok(())
