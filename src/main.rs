@@ -492,19 +492,36 @@ fn mkword(
         let msgstr = message.to_string();
         let mkword_cmd: Vec<&str> = msgstr.split(&mkword_pattern).collect();
         let mkword_kv: Vec<&str> = mkword_cmd[1].split(" ").collect();
+
+        if mkword_kv.len() < 2 {
+            client.send_privmsg(
+                channel,
+                format!(
+                    "you used mkword wrong dipshit: {}:{}",
+                    mkword_kv[0],
+                    mkword_kv[1..].join(" ").trim()
+                ),
+            )?;
+            return Ok(());
+        }
+
         if !db.lexists(&mkword_kv[0]) {
             db.lcreate(&mkword_kv[0])?;
         }
-        db.ladd(&mkword_kv[0], &mkword_kv[1..].join(" ").trim())
-            .unwrap();
-        client.send_privmsg(
-            channel,
-            format!(
-                "mkword added: {}:{}",
-                mkword_kv[0],
-                mkword_kv[1..].join(" ").trim()
-            ),
-        )?;
+
+        if db
+            .ladd(&mkword_kv[0], &mkword_kv[1..].join(" ").trim())
+            .is_some()
+        {
+            client.send_privmsg(
+                channel,
+                format!(
+                    "mkword added: {}:{}",
+                    mkword_kv[0],
+                    mkword_kv[1..].join(" ").trim()
+                ),
+            )?;
+        }
     }
 
     Ok(())
