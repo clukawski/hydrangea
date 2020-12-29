@@ -528,16 +528,41 @@ fn rmword(
         }
 
         if rmword_args.len() < 2 {
-            client.send_privmsg(channel, format!("rmword: invalid_arguments"))?;
-            return Err(format_err!("rmword: invalid arguments"));
+            let errmsg = format!(
+                "rmword: invalid_arguments: arg length {}",
+                rmword_args.len()
+            );
+            client.send_privmsg(channel, errmsg)?;
+            return Err(format_err!(
+                "rmword: invalid_arguments: arg length {}",
+                rmword_args.len()
+            ));
         }
 
-        db.lrem_value::<String>(rmword_args[0], &rmword_args[1..].join(" ").to_owned())
-            .unwrap();
+        if !db
+            .lrem_value::<String>(
+                rmword_args[0],
+                &rmword_args[1..].join(" ").trim().to_owned(),
+            )
+            .unwrap()
+        {
+            client.send_privmsg(
+                channel,
+                format!(
+                    "rmword: {}:{} doesn't exist",
+                    rmword_args[0],
+                    rmword_args[1..].join(" ").trim()
+                ),
+            )?;
+        }
 
         client.send_privmsg(
             channel,
-            format!("rmword: {}:{}", rmword_args[0], rmword_args[1..].join("")),
+            format!(
+                "rmword: {}:{}",
+                rmword_args[0],
+                rmword_args[1..].join(" ").trim()
+            ),
         )?;
     }
 
