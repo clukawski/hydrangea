@@ -612,7 +612,14 @@ fn abuse(
             let tpl_string = {
                 let tpl_string: String;
                 if tpl_set {
-                    tpl_string = db.lget::<String>("tpl", tpl_num).unwrap();
+                    if let Some(tpl) = db.lget::<String>("tpl", tpl_num) {
+                        tpl_string = tpl;
+                    } else {
+                        tpl_string = format!(
+                            "that template doesn't exist, {} you dipshit",
+                            message.source_nickname().unwrap()
+                        );
+                    }
                 } else {
                     let tpl_list = db.liter("tpl");
                     let item = tpl_list.choose(&mut rand::thread_rng()).unwrap();
