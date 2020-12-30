@@ -106,7 +106,7 @@ fn handle_message(
     message: &irc::proto::Message,
     mut db: &mut PickleDb,
 ) -> std::result::Result<(), failure::Error> {
-    abuse_old(&client, &message)?;
+    // abuse_old(&client, &message)?;
     smoke(&client, &message, &mut db)?;
     // link(&message)?;
     mktpl(&client, &message, &mut db)?;
@@ -168,7 +168,7 @@ fn smoke(
                 last: epoch,
             };
             db.set(&username, &new_smoker).unwrap();
-            client.send_privmsg(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", new_smoker.smokes, username, new_smoker.smokes, "s"))?;
+            client.send_notice(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", new_smoker.smokes, username, new_smoker.smokes, "s"))?;
         } else {
             let epoch = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -178,7 +178,7 @@ fn smoke(
             smoker.smokes = smoker.smokes + 1;
             smoker.last = epoch;
             db.set(&username, &smoker).unwrap();
-            client.send_privmsg(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", smoker.smokes, username, smoker.smokes, "s"))?;
+            client.send_notice(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", smoker.smokes, username, smoker.smokes, "s"))?;
         }
     }
 
@@ -194,7 +194,7 @@ fn theo(
     let theo = message.to_string().contains(&theo_pattern.to_string());
 
     if theo {
-        client.send_privmsg(channel, format!("theo: {}", find_theo().to_string()))?;
+        client.send_notice(channel, format!("theo: {}", find_theo().to_string()))?;
     }
 
     Ok(())
@@ -248,7 +248,7 @@ fn mktpl(
         }
         db.ladd("tpl", &mktpl_cmd[1].trim()).unwrap();
         let tpl_len = db.llen("tpl") - 1;
-        client.send_privmsg(
+        client.send_notice(
             channel,
             format!("mktpl added: {}:{}", tpl_len, mktpl_cmd[1]),
         )?;
@@ -274,7 +274,7 @@ fn mktpl(
 //             let tpl_list = db.liter("tpl");
 //             for tpl in tpl_list {
 //                 let tpl_string = tpl.get_item::<String>().unwrap();
-//                 client.send_privmsg(nickname, format!("lstpl: {}:{}", tpl_count, tpl_string))?;
+//                 client.send_notice(nickname, format!("lstpl: {}:{}", tpl_count, tpl_string))?;
 //                 tpl_count += 1;
 //             }
 //         }
@@ -294,7 +294,7 @@ fn lstpl(
 
     if is_lstpl {
         let tpl_db_len = db.llen("tpl");
-        client.send_privmsg(
+        client.send_notice(
             channel,
             format!("lstpl: {} templates (zero indexed)", tpl_db_len),
         )?;
@@ -325,7 +325,7 @@ fn showtpl(
             } else {
                 tpl_string = "that template doesn't exist you dipshit".to_owned();
             }
-            client.send_privmsg(channel, format!("showtpl: {}:{}", tpl_num, tpl_string))?;
+            client.send_notice(channel, format!("showtpl: {}:{}", tpl_num, tpl_string))?;
         }
     }
 
@@ -351,7 +351,7 @@ fn rmtpl(
         }
 
         db.lpop::<String>("tpl", rmtpl_cmd[1].trim().parse::<usize>().unwrap());
-        client.send_privmsg(channel, format!("rmtpl: {}", rmtpl_cmd[1]))?;
+        client.send_notice(channel, format!("rmtpl: {}", rmtpl_cmd[1]))?;
     }
 
     Ok(())
@@ -373,7 +373,7 @@ fn mkword(
         let mkword_kv: Vec<&str> = mkword_cmd[1].split(" ").collect();
 
         if mkword_kv.len() < 2 {
-            client.send_privmsg(
+            client.send_notice(
                 channel,
                 format!(
                     "you used mkword wrong dipshit: {}:{}",
@@ -392,7 +392,7 @@ fn mkword(
             .ladd(&mkword_kv[0], &mkword_kv[1..].join(" ").trim())
             .is_some()
         {
-            client.send_privmsg(
+            client.send_notice(
                 channel,
                 format!(
                     "mkword added: {}:{}",
@@ -428,7 +428,7 @@ fn rmword(
                 "rmword: invalid_arguments: arg length {}",
                 rmword_args.len()
             );
-            client.send_privmsg(channel, errmsg)?;
+            client.send_notice(channel, errmsg)?;
             return Err(format_err!(
                 "rmword: invalid_arguments: arg length {}",
                 rmword_args.len()
@@ -442,7 +442,7 @@ fn rmword(
             )
             .unwrap()
         {
-            client.send_privmsg(
+            client.send_notice(
                 channel,
                 format!(
                     "rmword: {}:{} doesn't exist",
@@ -452,7 +452,7 @@ fn rmword(
             )?;
         }
 
-        client.send_privmsg(
+        client.send_notice(
             channel,
             format!(
                 "rmword: {}:{}",
@@ -536,7 +536,7 @@ fn abuse(
 
             let mut reg = Handlebars::new();
             reg.register_escape_fn(handlebars::no_escape);
-            client.send_privmsg(
+            client.send_notice(
                 channel,
                 format!(
                     "{}",
@@ -576,14 +576,14 @@ fn abuse_old(
         let username = splitmsg[1];
         let trimmed = username.trim();
         client
-            .send_privmsg(channel, format!("{} loves rust", trimmed))
+            .send_notice(channel, format!("{} loves rust", trimmed))
             .unwrap();
     }
     if vivi {
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
         let username = splitmsg[1];
         let trimmed = username.trim();
-        client.send_privmsg(channel, format!("{} is planning on becoming a front end developer because he loves JavaScript so much", trimmed)).unwrap();
+        client.send_notice(channel, format!("{} is planning on becoming a front end developer because he loves JavaScript so much", trimmed)).unwrap();
     }
     if shivaram {
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
@@ -592,11 +592,11 @@ fn abuse_old(
 
         if rand::random() {
             client
-                .send_privmsg(channel, format!("{} loves plan 9 C", trimmed))
+                .send_notice(channel, format!("{} loves plan 9 C", trimmed))
                 .unwrap();
         } else {
             client
-                .send_privmsg(
+                .send_notice(
                     channel,
                     format!(
                         "{} doesn't believe in the importance of american military hegemony",
@@ -611,7 +611,7 @@ fn abuse_old(
         let username = splitmsg[1];
         let trimmed = username.trim();
         client
-            .send_privmsg(channel, format!("{} isn't a real programmer", trimmed))
+            .send_notice(channel, format!("{} isn't a real programmer", trimmed))
             .unwrap();
     }
     if wrmsr {
@@ -619,7 +619,7 @@ fn abuse_old(
         let username = splitmsg[1];
         let trimmed = username.trim();
         client
-            .send_privmsg(channel, format!("{} #1 nancy pelosi fan", trimmed))
+            .send_notice(channel, format!("{} #1 nancy pelosi fan", trimmed))
             .unwrap();
     }
     if ed {
@@ -627,21 +627,21 @@ fn abuse_old(
         let username = splitmsg[1];
         let trimmed = username.trim();
         client
-            .send_privmsg(
+            .send_notice(
                 channel,
                 format!("\x0352{}: ARE THOSE FEATURES DONE YET??? HOW ARE YOUR OKRs LOOKING? Look, we're going to need you to stack rank your team mmmmmmkayyy?\x03", trimmed),
             )
             .unwrap();
     }
     if pybot {
-        client.send_privmsg(channel, "sux to suck, luser").unwrap();
+        client.send_notice(channel, "sux to suck, luser").unwrap();
     }
     if carmen {
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
         let username = splitmsg[1];
         let trimmed = username.trim();
         client
-            .send_privmsg(channel, format!("\x0375{} loves android\x03", trimmed))
+            .send_notice(channel, format!("\x0375{} loves android\x03", trimmed))
             .unwrap();
     }
     if garrick {
@@ -649,7 +649,7 @@ fn abuse_old(
         let username = splitmsg[1];
         let trimmed = username.trim();
         client
-            .send_privmsg(
+            .send_notice(
                 channel,
                 format!("{} loves mutability and keeping state", trimmed),
             )
@@ -669,7 +669,7 @@ fn abuse_old(
         let splitmsg: Vec<&str> = msgstr.split(&splitstring).collect();
         let username = splitmsg[1];
         let trimmed = username.trim();
-        client.send_privmsg(channel, format!("{} loves JavaScript", trimmed))?;
+        client.send_notice(channel, format!("{} loves JavaScript", trimmed))?;
     }
 
     Ok(())
