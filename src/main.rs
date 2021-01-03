@@ -257,32 +257,6 @@ fn mktpl(
     Ok(())
 }
 
-// fn lstpl(
-//     client: &irc::client::Client,
-//     message: &irc::proto::Message,
-//     db: &mut PickleDb,
-// ) -> std::result::Result<(), failure::Error> {
-//     let channel = get_channel(message);
-//     let lstpl_pattern = format!("PRIVMSG {} lstpl", channel);
-//     let is_lstpl = message.to_string().contains(&lstpl_pattern.to_string());
-
-//     if is_lstpl {
-//         let tpl_db_len = db.llen("tpl");
-//         if tpl_db_len > 0 {
-//             let nickname = message.source_nickname().unwrap();
-//             let mut tpl_count = 0;
-//             let tpl_list = db.liter("tpl");
-//             for tpl in tpl_list {
-//                 let tpl_string = tpl.get_item::<String>().unwrap();
-//                 client.send_notice(nickname, format!("lstpl: {}:{}", tpl_count, tpl_string))?;
-//                 tpl_count += 1;
-//             }
-//         }
-//     }
-
-//     Ok(())
-// }
-
 fn lstpl(
     client: &irc::client::Client,
     message: &irc::proto::Message,
