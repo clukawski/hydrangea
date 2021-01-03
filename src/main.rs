@@ -35,8 +35,8 @@ struct Smoker {
     last: u64,
 }
 
-const USERNAME: &'static str = "pybot-rs";
 const CHANNELS: &'static [&'static str] = &["#bot"];
+const USERNAME: &'static str = "hydrangea";
 const NETWORK: &'static str = "irc.darwin.network";
 const PASSWORD: &'static str = "";
 const FILENAME: &str = "/home/conrad/theo";
