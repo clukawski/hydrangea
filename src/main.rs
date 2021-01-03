@@ -37,8 +37,8 @@ struct Smoker {
 
 const CHANNELS: &'static [&'static str] = &["#bot"];
 const USERNAME: &'static str = "hydrangea";
-const NETWORK: &'static str = "irc.darwin.network";
 const PASSWORD: &'static str = "";
+const NETWORK: &'static str = "";
 const FILENAME: &str = "/home/conrad/theo";
 
 #[tokio::main]
