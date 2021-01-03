@@ -1,6 +1,6 @@
 [package]
-name = "pybot-rs"
-version = "0.1.0"
+name = "hydrangea"
+version = "0.1.1"
 authors = ["conrad"]
 edition = "2018"
 

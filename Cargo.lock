@@ -422,6 +422,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "hydrangea"
+version = "0.1.1"
+dependencies = [
+ "failure",
+ "futures",
+ "handlebars",
+ "irc",
+ "linkify",
+ "openssl-sys",
+ "pickledb",
+ "radix64",
+ "rand",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "iovec"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -804,25 +823,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8872cf6f48eee44265156c111456a700ab3483686b3f96df4cf5481c89157319"
 dependencies = [
  "unicode-xid",
-]
-
-[[package]]
-name = "pybot-rs"
-version = "0.1.0"
-dependencies = [
- "failure",
- "futures",
- "handlebars",
- "irc",
- "linkify",
- "openssl-sys",
- "pickledb",
- "radix64",
- "rand",
- "regex",
- "serde",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
