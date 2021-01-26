@@ -106,7 +106,6 @@ fn handle_message(
     message: &irc::proto::Message,
     mut db: &mut PickleDb,
 ) -> std::result::Result<(), failure::Error> {
-    // abuse_old(&client, &message)?;
     smoke(&client, &message, &mut db)?;
     // link(&message)?;
     mktpl(&client, &message, &mut db)?;
