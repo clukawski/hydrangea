@@ -10,6 +10,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 extern crate regex;
+extern crate reqwest;
 
 use failure::format_err;
 use futures::prelude::*;
@@ -115,7 +116,7 @@ fn handle_message(
     lstpl(&client, &message, &mut db)?;
     rmtpl(&client, &message, &mut db)?;
     showtpl(&client, &message, &mut db)?;
-
+    bloom(&client, &message, &mut db);
     theo(&client, &message)?;
     abuse(&client, &message, &mut db)?;
     Ok(())
@@ -520,5 +521,22 @@ fn abuse(
         }
     }
 
+    Ok(())
+}
+
+async fn bloom(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let bloom_pattern = format!("PRIVMSG {} bloom ", channel);
+    let is_bloom = message.to_string().contains(&bloom_pattern.to_string())
+        && !message.to_string().trim().ends_with("bloom");
+
+    if is_bloom {
+        let map = reqwest::get("https://example.com").await?.text().await?;
+        println!("{}", map)
+    }
     Ok(())
 }
