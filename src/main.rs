@@ -22,7 +22,7 @@ use rand::seq::IteratorRandom;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
     fs::File,
@@ -35,10 +35,10 @@ struct Smoker {
     last: u64,
 }
 
-const CHANNELS: &'static [&'static str] = &["#bot"];
-const USERNAME: &'static str = "hydrangea";
-const PASSWORD: &'static str = "";
-const NETWORK: &'static str = "";
+const CHANNELS: &[&str] = &["#bot"];
+const USERNAME: &str = "hydrangea";
+const PASSWORD: &str = "";
+const NETWORK: &str = "";
 const FILENAME: &str = "/home/conrad/theo";
 
 #[tokio::main]
@@ -66,7 +66,7 @@ async fn main() -> Result<(), failure::Error> {
             password: Some(PASSWORD.to_owned()),
             use_tls: Some(true),
             server: Some(NETWORK.to_owned()),
-            channels: channels,
+            channels,
             port: Some(6697),
             ..Config::default()
         };
@@ -80,7 +80,7 @@ async fn main() -> Result<(), failure::Error> {
         while let Some(message) = stream.next().await.transpose()? {
             print!("{}", message);
             if message.to_string().contains("KICK #") && message.to_string().contains("pybot-rs") {
-                client.send_quit(format!("GOODBYE FOREVER"))?;
+                client.send_quit("GOODBYE FOREVER")?;
                 break;
             }
 
@@ -93,7 +93,7 @@ async fn main() -> Result<(), failure::Error> {
             }
         }
 
-        retry_count = retry_count - 1;
+        retry_count -= 1;
         if retry_count == 0 {
             break;
         }
@@ -123,7 +123,7 @@ fn handle_message(
 fn authenticate(
     client: &irc::client::Client,
     message: &irc::proto::Message,
-    mut authenticated: &bool,
+    authenticated: &mut bool,
 ) -> std::result::Result<(), failure::Error> {
     if authenticated != &true {
         // Handle CAP LS
@@ -138,7 +138,7 @@ fn authenticate(
             print!("prompt to authenticate");
         }
         if message.to_string().contains("Authentication successful") {
-            authenticated = &true;
+            *authenticated = true;
             client.identify()?;
         }
     }
@@ -155,8 +155,8 @@ fn smoke(
     let splitstring = format!("PRIVMSG {} smoke", channel);
     if message.to_string().contains(&splitstring) {
         let msgstr = message.to_string();
-        let splitmsg: Vec<&str> = msgstr.split("!").collect();
-        let username = splitmsg[0].trim_start_matches(":");
+        let splitmsg: Vec<&str> = msgstr.split('!').collect();
+        let username = splitmsg[0].trim_start_matches(':');
         if db.get::<Smoker>(&username).is_none() {
             let epoch = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -174,7 +174,7 @@ fn smoke(
                 .unwrap()
                 .as_secs();
             let mut smoker = db.get::<Smoker>(&username).unwrap();
-            smoker.smokes = smoker.smokes + 1;
+            smoker.smokes += 1;
             smoker.last = epoch;
             db.set(&username, &smoker).unwrap();
             client.send_notice(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", smoker.smokes, username, smoker.smokes, "s"))?;
@@ -190,10 +190,10 @@ fn theo(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let theo_pattern = format!("PRIVMSG {} theo", channel);
-    let theo = message.to_string().contains(&theo_pattern.to_string());
+    let theo = message.to_string().contains(&theo_pattern);
 
     if theo {
-        client.send_notice(channel, format!("theo: {}", find_theo().to_string()))?;
+        client.send_notice(channel, format!("theo: {}", find_theo()))?;
     }
 
     Ok(())
@@ -237,7 +237,7 @@ fn mktpl(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let mktpl_pattern = format!("PRIVMSG {} :mktpl ", channel);
-    let is_mktpl = message.to_string().contains(&mktpl_pattern.to_string());
+    let is_mktpl = message.to_string().contains(&mktpl_pattern);
 
     if is_mktpl {
         let msgstr = message.to_string();
@@ -263,7 +263,7 @@ fn lstpl(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let lstpl_pattern = format!("PRIVMSG {} lstpl", channel);
-    let is_lstpl = message.to_string().contains(&lstpl_pattern.to_string());
+    let is_lstpl = message.to_string().contains(&lstpl_pattern);
 
     if is_lstpl {
         let tpl_db_len = db.llen("tpl");
@@ -284,7 +284,7 @@ fn showtpl(
     let channel = get_channel(message);
     let msgstr = message.to_string();
     let showtpl_pattern = format!("PRIVMSG {} :showtpl ", channel);
-    let is_showtpl = message.to_string().contains(&showtpl_pattern.to_string());
+    let is_showtpl = message.to_string().contains(&showtpl_pattern);
 
     if is_showtpl {
         let showtpl_cmd: Vec<&str> = msgstr.split(&showtpl_pattern).collect();
@@ -312,7 +312,7 @@ fn rmtpl(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let rmtpl_pattern = format!("PRIVMSG {} :rmtpl ", channel);
-    let is_rmtpl = message.to_string().contains(&rmtpl_pattern.to_string());
+    let is_rmtpl = message.to_string().contains(&rmtpl_pattern);
 
     if is_rmtpl {
         let msgstr = message.to_string();
@@ -338,12 +338,12 @@ fn mkword(
     // TODO: mkword and mktpl are basically the same fn
     let channel = get_channel(message);
     let mkword_pattern = format!("PRIVMSG {} :mkword ", channel);
-    let is_mkword = message.to_string().contains(&mkword_pattern.to_string());
+    let is_mkword = message.to_string().contains(&mkword_pattern);
 
     if is_mkword {
         let msgstr = message.to_string();
         let mkword_cmd: Vec<&str> = msgstr.split(&mkword_pattern).collect();
-        let mkword_kv: Vec<&str> = mkword_cmd[1].split(" ").collect();
+        let mkword_kv: Vec<&str> = mkword_cmd[1].split(' ').collect();
 
         if mkword_kv.len() < 2 {
             client.send_notice(
@@ -386,11 +386,11 @@ fn rmword(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let rmword_pattern = format!("PRIVMSG {} :rmword ", channel);
-    let is_rmword = message.to_string().contains(&rmword_pattern.to_string());
+    let is_rmword = message.to_string().contains(&rmword_pattern);
     if is_rmword {
         let msgstr = message.to_string();
         let rmword_cmd: Vec<&str> = msgstr.split(&rmword_pattern).collect();
-        let rmword_args: Vec<&str> = rmword_cmd[1].split(" ").collect();
+        let rmword_args: Vec<&str> = rmword_cmd[1].split(' ').collect();
 
         if !db.lexists(rmword_args[0]) {
             return Ok(());
@@ -445,13 +445,13 @@ fn abuse(
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
     let abuse_pattern = format!("PRIVMSG {} :abuse ", channel);
-    let is_abuse = message.to_string().contains(&abuse_pattern.to_string())
+    let is_abuse = message.to_string().contains(&abuse_pattern)
         && !message.to_string().trim().ends_with(":abuse");
 
     if is_abuse {
         let msgstr = message.to_string();
         let abuse_cmd: Vec<&str> = msgstr.trim().split(&abuse_pattern).collect();
-        let abuse_args: Vec<&str> = abuse_cmd[1].split(" ").collect();
+        let abuse_args: Vec<&str> = abuse_cmd[1].split(' ').collect();
         let name = abuse_args[0].trim();
         let mut tpl_num = 0;
         let mut tpl_set = false;
@@ -511,10 +511,7 @@ fn abuse(
             reg.register_escape_fn(handlebars::no_escape);
             client.send_notice(
                 channel,
-                format!(
-                    "{}",
-                    reg.render_template(&tpl_string, &json!(replacements))?
-                ),
+                reg.render_template(&tpl_string, &json!(replacements))?,
             )?;
         }
     }
