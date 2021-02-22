@@ -9,9 +9,12 @@ extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
-extern crate regex;
+extern crate fancy_regex;
+extern crate reqwest;
+extern crate urlparse;
 
 use failure::format_err;
+use fancy_regex::Regex;
 use futures::prelude::*;
 use handlebars::Handlebars;
 use irc::client::prelude::*;
@@ -19,9 +22,11 @@ use linkify::LinkFinder;
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use radix64::STD;
 use rand::seq::IteratorRandom;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
+use std::{thread, time};
+use urlparse::urlparse;
+
 // use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
@@ -33,6 +38,11 @@ use std::{
 struct Smoker {
     smokes: i32,
     last: u64,
+}
+
+#[derive(Deserialize)]
+struct CBCTitle {
+    headline: String,
 }
 
 const CHANNELS: &[&str] = &["#bot"];
@@ -58,44 +68,55 @@ async fn main() -> Result<(), failure::Error> {
         ),
     };
 
-    let mut retry_count: i32 = 999;
+    let mut retry_count = 69420;
     loop {
-        let channels: Vec<_> = CHANNELS.iter().map(|s| s.to_string()).collect();
-        let config = Config {
-            nickname: Some(USERNAME.to_owned()),
-            password: Some(PASSWORD.to_owned()),
-            use_tls: Some(true),
-            server: Some(NETWORK.to_owned()),
-            channels,
-            port: Some(6697),
-            ..Config::default()
-        };
-
-        let mut client = Client::from_config(config).await?;
-        let mut authenticated = false;
-
-        client.send_cap_ls(NegotiationVersion::V302).unwrap();
-        let mut stream = client.stream()?;
-
-        while let Some(message) = stream.next().await.transpose()? {
-            print!("{}", message);
-            if message.to_string().contains("KICK #") && message.to_string().contains("pybot-rs") {
-                client.send_quit("GOODBYE FOREVER")?;
-                break;
-            }
-
-            if let Err(auth_result) = authenticate(&client, &message, &mut authenticated) {
-                eprintln!("{:?}", auth_result);
-            }
-
-            if let Err(message_result) = handle_message(&client, &message, &mut db) {
-                eprintln!("{:?}", message_result);
-            }
+        if let Err(e) = main_loop(&mut db).await {
+            eprintln!("{}", e);
         }
 
+        let wait_seconds = time::Duration::from_secs(3);
+
+        thread::sleep(wait_seconds);
         retry_count -= 1;
         if retry_count == 0 {
             break;
+        }
+    }
+
+    Ok(())
+}
+
+async fn main_loop(mut db: &mut PickleDb) -> std::result::Result<(), failure::Error> {
+    let channels: Vec<_> = CHANNELS.iter().map(|s| s.to_string()).collect();
+    let config = Config {
+        nickname: Some(USERNAME.to_owned()),
+        password: Some(PASSWORD.to_owned()),
+        use_tls: Some(true),
+        server: Some(NETWORK.to_owned()),
+        channels,
+        port: Some(6697),
+        ..Config::default()
+    };
+
+    let mut client = Client::from_config(config).await?;
+    let mut authenticated = false;
+
+    client.send_cap_ls(NegotiationVersion::V302).unwrap();
+    let mut stream = client.stream()?;
+
+    while let Some(message) = stream.next().await.transpose()? {
+        print!("{}", message);
+        if message.to_string().contains("KICK #") && message.to_string().contains("pybot-rs") {
+            client.send_quit("GOODBYE FOREVER")?;
+            break;
+        }
+
+        if let Err(auth_result) = authenticate(&client, &message, &mut authenticated) {
+            eprintln!("{:?}", auth_result);
+        }
+
+        if let Err(message_result) = handle_message(&client, &message, &mut db) {
+            eprintln!("{:?}", message_result);
         }
     }
     Ok(())
@@ -114,7 +135,7 @@ fn handle_message(
     lstpl(&client, &message, &mut db)?;
     rmtpl(&client, &message, &mut db)?;
     showtpl(&client, &message, &mut db)?;
-
+    cbctitle(&client, &message)?;
     theo(&client, &message)?;
     abuse(&client, &message, &mut db)?;
     Ok(())
@@ -199,12 +220,60 @@ fn theo(
     Ok(())
 }
 
-// TODO
-fn link(message: &irc::proto::Message) -> std::result::Result<(), failure::Error> {
+// // TODO
+// fn link(message: &irc::proto::Message) -> std::result::Result<(), failure::Error> {
+//     let finder = LinkFinder::new();
+//     let msg = &message.to_string();
+//     let links: Vec<_> = finder.links(msg).collect();
+//     println!("{:?}", links);
+
+//     Ok(())
+// }
+
+fn cbctitle(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
     let finder = LinkFinder::new();
     let msg = &message.to_string();
     let links: Vec<_> = finder.links(msg).collect();
-    println!("{:?}", links);
+
+    if links.is_empty() {
+        return Ok(());
+    }
+
+    let mut sports = false;
+    let mut linkstr = "";
+    for link in links {
+        if link.as_str().contains("cbc.ca") {
+            sports = link.as_str().contains("sports");
+            linkstr = link.as_str();
+            break;
+        }
+    }
+
+    let url = urlparse(linkstr);
+    if !url.netloc.contains("cbc.ca") {
+        return Ok(());
+    };
+
+    let re = Regex::new(r"(?<=1.)[0-9]+").unwrap();
+    let matches = re.find_iter(&url.path);
+
+    let m = matches.into_iter().next();
+    let query = format!(
+        "http://www.cbc.ca/json/cmlink/1.{}",
+        m.unwrap().unwrap().as_str()
+    );
+
+    let resp = reqwest::blocking::get(&query)?.text()?;
+    let title: CBCTitle = serde_json::from_str(&resp)?;
+    if sports {
+        client.send_notice(channel, format!("{} | CBC Sports", title.headline))?;
+    } else {
+        client.send_notice(channel, format!("{} | CBC News", title.headline))?;
+    }
 
     Ok(())
 }
@@ -487,7 +556,7 @@ fn abuse(
             replacements.insert("name".to_string(), name.into());
 
             for m in matches {
-                let word_type = m.as_str().trim_matches(|c| c == '{' || c == '}');
+                let word_type = m.unwrap().as_str().trim_matches(|c| c == '{' || c == '}');
                 if word_type == "name" {
                     continue;
                 }
