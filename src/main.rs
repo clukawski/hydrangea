@@ -534,7 +534,7 @@ fn help(
     message: &irc::proto::Message,
 ) -> std::result::Result<(), failure::Error> {
     let channel = get_channel(message);
-    let help_pattern = format!("PRIVMSG {} help", channel);
+    let help_pattern = format!("PRIVMSG {} :hydrangea: help", channel);
     let is_help = message.to_string().contains(&help_pattern);
 
     if is_help {
