@@ -47,22 +47,23 @@ struct CBCTitle {
 
 const CHANNELS: &[&str] = &["#bot"];
 const USERNAME: &str = "hydrangea";
-const PASSWORD: &str = "";
-const NETWORK: &str = "";
-const FILENAME: &str = "/home/conrad/theo";
+const PASSWORD: &str = "yourmom";
+const NETWORK: &str = "irc.your.mom";
+const FILENAME: &str = "/opt/hydrangea/theo";
+const DB_LOC: &str = "/opt/hydrangea/hydrangea.db";
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
     // Configure the database
     let db = PickleDb::load(
-        "pybot.db",
+        DB_LOC,
         PickleDbDumpPolicy::AutoDump,
         SerializationMethod::Json,
     );
     let mut db = match db {
         Ok(db) => db,
         Err(_) => PickleDb::new(
-            "pybot.db",
+            DB_LOC,
             PickleDbDumpPolicy::AutoDump,
             SerializationMethod::Json,
         ),
@@ -138,6 +139,7 @@ fn handle_message(
     cbctitle(&client, &message)?;
     theo(&client, &message)?;
     abuse(&client, &message, &mut db)?;
+    lasttpl(&client, &message, &mut db)?;
     Ok(())
 }
 
@@ -507,6 +509,25 @@ fn rmword(
     Ok(())
 }
 
+fn lasttpl(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let lasttpl_pattern = format!("PRIVMSG {} lasttpl", channel);
+    let is_lasttpl = message.to_string().contains(&lasttpl_pattern);
+
+    if is_lasttpl && db.exists("lasttpl") {
+        let lasttpl: u64 = db.get("lasttpl").unwrap();
+        client.send_notice(channel, format!("lasttpl: {}", lasttpl))?;
+
+        return Ok(());
+    }
+
+    Ok(())
+}
+
 fn abuse(
     client: &irc::client::Client,
     message: &irc::proto::Message,
@@ -535,10 +556,12 @@ fn abuse(
                 let tpl_string: String;
                 if tpl_set {
                     if let Some(tpl) = db.lget::<String>("tpl", tpl_num) {
+                        db.set("lasttpl", &tpl_num)?;
                         tpl_string = tpl;
                     } else {
                         tpl_string = format!(
-                            "that template doesn't exist, {} you dipshit",
+                            "that template {} doesn't exist, {} you dipshit",
+                            tpl_num,
                             message.source_nickname().unwrap()
                         );
                     }
