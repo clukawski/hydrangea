@@ -138,6 +138,7 @@ fn handle_message(
     showtpl(&client, &message, &mut db)?;
     cbctitle(&client, &message)?;
     theo(&client, &message)?;
+    help(&client, &message)?;
     abuse(&client, &message, &mut db)?;
     lasttpl(&client, &message, &mut db)?;
     Ok(())
@@ -521,6 +522,26 @@ fn lasttpl(
     if is_lasttpl && db.exists("lasttpl") {
         let lasttpl: u64 = db.get("lasttpl").unwrap();
         client.send_notice(channel, format!("lasttpl: {}", lasttpl))?;
+
+        return Ok(());
+    }
+
+    Ok(())
+}
+
+fn help(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let help_pattern = format!("PRIVMSG {} help", channel);
+    let is_help = message.to_string().contains(&help_pattern);
+
+    if is_help {
+        client.send_notice(
+            channel,
+            format!("help: \"mkword type word\", \"rmword type word\", etc"),
+        )?;
 
         return Ok(());
     }
