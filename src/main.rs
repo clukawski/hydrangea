@@ -265,17 +265,24 @@ fn cbctitle(
     let matches = re.find_iter(&url.path);
 
     let m = matches.into_iter().next();
-    let query = format!(
-        "http://www.cbc.ca/json/cmlink/1.{}",
-        m.unwrap().unwrap().as_str()
-    );
+    if !m.is_none() {
+        let query = format!(
+            "http://www.cbc.ca/json/cmlink/1.{}",
+            m.unwrap().unwrap().as_str()
+        );
+        let resp = reqwest::blocking::get(&query)?.text()?;
+        let title: CBCTitle = serde_json::from_str(&resp)?;
 
-    let resp = reqwest::blocking::get(&query)?.text()?;
-    let title: CBCTitle = serde_json::from_str(&resp)?;
-    if sports {
-        client.send_notice(channel, format!("{} | CBC Sports", title.headline))?;
+        if sports {
+            client.send_notice(channel, format!("{} | CBC Sports", title.headline))?;
+        } else {
+            client.send_notice(channel, format!("{} | CBC News", title.headline))?;
+        }
     } else {
-        client.send_notice(channel, format!("{} | CBC News", title.headline))?;
+        client.send_notice(
+            channel,
+            format!("{} | CBC Yeah I dunno mate", "It ain't workin for this one"),
+        )?;
     }
 
     Ok(())
