@@ -265,7 +265,7 @@ fn cbctitle(
     let matches = re.find_iter(&url.path);
 
     let m = matches.into_iter().next();
-    if !m.is_none() {
+    if m.is_some() {
         let query = format!(
             "http://www.cbc.ca/json/cmlink/1.{}",
             m.unwrap().unwrap().as_str()
