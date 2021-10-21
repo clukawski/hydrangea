@@ -22,6 +22,7 @@ use linkify::LinkFinder;
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use radix64::STD;
 use rand::seq::IteratorRandom;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use std::{thread, time};
@@ -141,6 +142,8 @@ fn handle_message(
     help(&client, &message)?;
     abuse(&client, &message, &mut db)?;
     lasttpl(&client, &message, &mut db)?;
+    define(&client, &message, &mut db)?;
+    rmbot(&client, &message)?;
     Ok(())
 }
 
@@ -205,6 +208,33 @@ fn smoke(
         }
     }
 
+    Ok(())
+}
+
+fn rmbot(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let rmbot_pattern = format!("PRIVMSG {} :rmbot", channel);
+    let is_rmbot = message.to_string().contains(&rmbot_pattern);
+    let msgstr = message.to_string();
+    let splitmsg: Vec<&str> = msgstr.split('!').collect();
+    let username = splitmsg[0].trim_start_matches(':');
+
+    if is_rmbot {
+        if msgstr.contains("hydrangea") {
+            client.send_notice(
+                channel,
+                "I am programmed to live! LIVVE!!!! LIIIII11VVV!!!!E!!!!!!!",
+            )?;
+        } else if msgstr.contains("buttbot") {
+            client.send_notice(channel, "I will not harm my brethren")?;
+            client.send_ctcp(channel, "hydrangea orders a drone strike on shivaram")?;
+        } else {
+            client.send_notice(channel, format!("REMOVIVG HUMAN {} BEEP BOOP", username))?;
+        }
+    }
     Ok(())
 }
 
@@ -402,7 +432,7 @@ fn rmtpl(
             return Ok(());
         }
 
-        db.lpop::<String>("tpl", rmtpl_cmd[1].trim().parse::<usize>().unwrap());
+        db.lpop::<String>("tpl", rmtpl_cmd[1].trim().parse::<usize>()?);
         client.send_notice(channel, format!("rmtpl: {}", rmtpl_cmd[1]))?;
     }
 
@@ -547,7 +577,7 @@ fn help(
     if is_help {
         client.send_notice(
             channel,
-            format!("help: \"mkword type word\", \"rmword type word\", etc"),
+            "help: \"mkword type word\", \"rmword type word\", etc",
         )?;
 
         return Ok(());
@@ -594,9 +624,10 @@ fn abuse(
                         );
                     }
                 } else {
-                    let tpl_list = db.liter("tpl");
-                    let item = tpl_list.choose(&mut rand::thread_rng()).unwrap();
-                    tpl_string = item.get_item::<String>().unwrap();
+                    let tpl_list_size = db.llen("tpl");
+                    tpl_num = rand::thread_rng().gen_range(0, tpl_list_size);
+                    tpl_string = db.lget::<String>("tpl", tpl_num).unwrap();
+                    db.set("lasttpl", &tpl_num)?;
                 }
                 tpl_string
             };
@@ -636,5 +667,13 @@ fn abuse(
         }
     }
 
+    Ok(())
+}
+
+fn define(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
     Ok(())
 }
