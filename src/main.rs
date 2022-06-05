@@ -10,6 +10,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 extern crate fancy_regex;
+extern crate html_escape;
 extern crate reqwest;
 extern crate urlparse;
 
@@ -25,6 +26,8 @@ use rand::seq::IteratorRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
+use std::io::{self, Write};
+use std::process::Command;
 use std::{thread, time};
 use urlparse::urlparse;
 
@@ -47,6 +50,33 @@ struct CBCTitle {
 }
 
 const CHANNELS: &[&str] = &["#bot"];
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Root {
+    pub list: Vec<List>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct List {
+    pub definition: String,
+    pub permalink: String,
+    #[serde(rename = "thumbs_up")]
+    pub thumbs_up: i64,
+    #[serde(rename = "sound_urls")]
+    pub sound_urls: Vec<String>,
+    pub author: String,
+    pub word: String,
+    pub defid: i64,
+    #[serde(rename = "current_vote")]
+    pub current_vote: String,
+    #[serde(rename = "written_on")]
+    pub written_on: String,
+    pub example: String,
+    #[serde(rename = "thumbs_down")]
+    pub thumbs_down: i64,
+}
+
 const USERNAME: &str = "hydrangea";
 const PASSWORD: &str = "yourmom";
 const NETWORK: &str = "irc.your.mom";
@@ -69,26 +99,6 @@ async fn main() -> Result<(), failure::Error> {
             SerializationMethod::Json,
         ),
     };
-
-    let mut retry_count = 69420;
-    loop {
-        if let Err(e) = main_loop(&mut db).await {
-            eprintln!("{}", e);
-        }
-
-        let wait_seconds = time::Duration::from_secs(3);
-
-        thread::sleep(wait_seconds);
-        retry_count -= 1;
-        if retry_count == 0 {
-            break;
-        }
-    }
-
-    Ok(())
-}
-
-async fn main_loop(mut db: &mut PickleDb) -> std::result::Result<(), failure::Error> {
     let channels: Vec<_> = CHANNELS.iter().map(|s| s.to_string()).collect();
     let config = Config {
         nickname: Some(USERNAME.to_owned()),
@@ -101,24 +111,48 @@ async fn main_loop(mut db: &mut PickleDb) -> std::result::Result<(), failure::Er
     };
 
     let mut client = Client::from_config(config).await?;
-    let mut authenticated = false;
+    let mut retry_count = 69420;
+    loop {
+        if let Err(e) = main_loop(&mut client, &mut db).await {
+            eprintln!("{}", e);
+        }
 
-    client.send_cap_ls(NegotiationVersion::V302).unwrap();
+        let wait_seconds = time::Duration::from_secs(3);
+        thread::sleep(wait_seconds);
+        retry_count -= 1;
+        if retry_count == 0 {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+async fn main_loop(
+    client: &mut irc::client::Client,
+    mut db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let mut authenticated = false;
+    let mut quit = false;
+
+    client.send_cap_ls(NegotiationVersion::V302)?;
     let mut stream = client.stream()?;
 
     while let Some(message) = stream.next().await.transpose()? {
         print!("{}", message);
-        if message.to_string().contains("KICK #") && message.to_string().contains("pybot-rs") {
+        if message.to_string().contains("KICK #") && message.to_string().contains("hydrangea") {
             client.send_quit("GOODBYE FOREVER")?;
-            break;
+            quit = true;
         }
 
-        if let Err(auth_result) = authenticate(&client, &message, &mut authenticated) {
-            eprintln!("{:?}", auth_result);
-        }
+        if !quit {
+            if let Err(auth_result) = authenticate(&client, &message, &mut authenticated) {
+                eprintln!("{:?}", auth_result);
+            }
 
-        if let Err(message_result) = handle_message(&client, &message, &mut db) {
-            eprintln!("{:?}", message_result);
+            if let Err(message_result) = handle_message(&client, &message, &mut db) {
+                eprintln!("{:?}", message_result);
+            }
         }
     }
     Ok(())
@@ -130,7 +164,7 @@ fn handle_message(
     mut db: &mut PickleDb,
 ) -> std::result::Result<(), failure::Error> {
     smoke(&client, &message, &mut db)?;
-    // link(&message)?;
+    smoko(&client, &message, &mut db)?;
     mktpl(&client, &message, &mut db)?;
     mkword(&client, &message, &mut db)?;
     rmword(&client, &message, &mut db)?;
@@ -139,6 +173,8 @@ fn handle_message(
     showtpl(&client, &message, &mut db)?;
     cbctitle(&client, &message)?;
     theo(&client, &message)?;
+    // ytlink(&client, &message)?;
+    // dmlink(&client, &message)?;
     help(&client, &message)?;
     abuse(&client, &message, &mut db)?;
     lasttpl(&client, &message, &mut db)?;
@@ -155,13 +191,13 @@ fn authenticate(
     if authenticated != &true {
         // Handle CAP LS
         if message.to_string().contains("sasl=PLAIN") {
-            client.send_sasl_plain().unwrap();
+            client.send_sasl_plain()?;
             print!("sasl plain available");
         }
         if message.to_string().contains("AUTHENTICATE +") {
             let toencode = format!("{}\0{}\0{}", USERNAME, USERNAME, PASSWORD);
             let encoded = STD.encode(&toencode);
-            client.send_sasl(encoded).unwrap();
+            client.send_sasl(encoded)?;
             print!("prompt to authenticate");
         }
         if message.to_string().contains("Authentication successful") {
@@ -185,26 +221,67 @@ fn smoke(
         let splitmsg: Vec<&str> = msgstr.split('!').collect();
         let username = splitmsg[0].trim_start_matches(':');
         if db.get::<Smoker>(&username).is_none() {
-            let epoch = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let epoch = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
             let new_smoker = Smoker {
                 smokes: 1,
                 last: epoch,
             };
-            db.set(&username, &new_smoker).unwrap();
+
+            db.set(&username, &new_smoker)?;
             client.send_notice(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", new_smoker.smokes, username, new_smoker.smokes, "s"))?;
         } else {
-            let epoch = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let epoch = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+            let mut smoker = db.get::<Smoker>(&username);
+            if smoker.is_none() {
+                return Ok(());
+            }
+
+            let mut smoker = smoker.unwrap();
+            smoker.smokes += 1;
+            smoker.last = epoch;
+            db.set(&username, &smoker)?;
+            client.send_notice(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", smoker.smokes, username, smoker.smokes, "s"))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn smoko(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+    db: &mut PickleDb,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let splitstring = format!("PRIVMSG {} smoko", channel);
+    if message.to_string().contains(&splitstring) {
+        let msgstr = message.to_string();
+        let splitmsg: Vec<&str> = msgstr.split('!').collect();
+        let username = splitmsg[0].trim_start_matches(':');
+        if db.get::<Smoker>(&username).is_none() {
+            let epoch = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+            let new_smoker = Smoker {
+                smokes: 1,
+                last: epoch,
+            };
+            db.set(&username, &new_smoker)?;
+            client.send_notice(
+                channel,
+                format!(
+                    "{} is on smoko {}, leave em alone",
+                    username, new_smoker.smokes
+                ),
+            )?;
+        } else {
+            let epoch = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
             let mut smoker = db.get::<Smoker>(&username).unwrap();
             smoker.smokes += 1;
             smoker.last = epoch;
-            db.set(&username, &smoker).unwrap();
-            client.send_notice(channel, format!("That's smoke #{} for {} so far today... This brings you to a grand total of {} smoke{}. Keep up killing yourself with cancer!", smoker.smokes, username, smoker.smokes, "s"))?;
+            db.set(&username, &smoker)?;
+            client.send_notice(
+                channel,
+                format!("{} is on smoko {}, leave em alone", username, smoker.smokes),
+            )?;
         }
     }
 
@@ -247,21 +324,73 @@ fn theo(
     let theo = message.to_string().contains(&theo_pattern);
 
     if theo {
-        client.send_notice(channel, format!("theo: {}", find_theo()))?;
+        let theo_text = find_theo();
+        match theo_text {
+            Ok(s) => client.send_notice(channel, format!("theo: {}", s))?,
+            Error => client.send_notice(channel, "theo: You didn't even add the fortune file, so how could you expect to use our software?")?,
+        }
     }
 
     Ok(())
 }
 
-// // TODO
-// fn link(message: &irc::proto::Message) -> std::result::Result<(), failure::Error> {
-//     let finder = LinkFinder::new();
-//     let msg = &message.to_string();
-//     let links: Vec<_> = finder.links(msg).collect();
-//     println!("{:?}", links);
+fn dmlink(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let finder = LinkFinder::new();
+    let msg = &message.to_string();
+    let links: Vec<_> = finder.links(msg).collect();
 
-//     Ok(())
-// }
+    for link in links {
+        if link.as_str().contains("dailymotion.com") {
+            let output = Command::new("/home/conrad/dailymotion.sh")
+                .arg(link.as_str())
+                .output()
+                .expect("failed to execute process");
+
+            let title = String::from_utf8(output.stdout)?;
+            // Print the title of the Video
+            client.send_notice(
+                channel,
+                format!("{}", html_escape::decode_html_entities(&title)),
+            )?;
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn ytlink(
+    client: &irc::client::Client,
+    message: &irc::proto::Message,
+) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let finder = LinkFinder::new();
+    let msg = &message.to_string();
+    let links: Vec<_> = finder.links(msg).collect();
+
+    for link in links {
+        if link.as_str().contains("youtube.com") || link.as_str().contains("youtu.be") {
+            let output = Command::new("/home/conrad/youtube.sh")
+                .arg(link.as_str())
+                .output()
+                .expect("failed to execute process");
+
+            let title = String::from_utf8(output.stdout)?;
+            // Print the title of the Video
+            client.send_notice(
+                channel,
+                format!("{}", html_escape::decode_html_entities(&title)),
+            )?;
+            break;
+        }
+    }
+
+    Ok(())
+}
 
 fn cbctitle(
     client: &irc::client::Client,
@@ -291,7 +420,7 @@ fn cbctitle(
         return Ok(());
     };
 
-    let re = Regex::new(r"(?<=1.)[0-9]+").unwrap();
+    let re = Regex::new(r"(?<=1.)[0-9]+")?;
     let matches = re.find_iter(&url.path);
 
     let m = matches.into_iter().next();
@@ -327,16 +456,15 @@ fn get_channel(message: &irc::proto::Message) -> &str {
     ""
 }
 
-fn find_theo() -> String {
-    let f = File::open(FILENAME)
-        .unwrap_or_else(|e| panic!("(;_;) file not found: {}: {}", FILENAME, e));
+fn find_theo() -> std::result::Result<String, failure::Error> {
+    let f = File::open(FILENAME)?;
     let f = BufReader::new(f);
 
     let lines = f.lines().map(|l| l.expect("Couldn't read line"));
 
-    lines
+    Ok(lines
         .choose(&mut rand::thread_rng())
-        .expect("File had no lines")
+        .expect("File had no lines"))
 }
 
 fn mktpl(
@@ -675,5 +803,31 @@ fn define(
     message: &irc::proto::Message,
     db: &mut PickleDb,
 ) -> std::result::Result<(), failure::Error> {
+    let channel = get_channel(message);
+    let define_pattern = format!("PRIVMSG {} :define ", channel);
+    let define_msg = message.to_string();
+    let define_strings: Vec<&str> = define_msg.split(&define_pattern).collect();
+    if define_strings.len() >= 2 {
+        let query = format!(
+            "https://api.urbandictionary.com/v0/define?term={}",
+            define_strings[1]
+        );
+        let resp: Root = reqwest::blocking::get(&query)?.json::<Root>()?;
+        if resp.list.len() > 0 {
+            client.send_notice(
+                channel,
+                format!(
+                    "define: {}: {}",
+                    define_strings[1].trim(),
+                    &resp.list[0].definition.trim()
+                ),
+            )?;
+        } else {
+            client.send_notice(
+                channel,
+                format!("define: found nothing for {}", define_strings[1]),
+            )?;
+        }
+    }
     Ok(())
 }
