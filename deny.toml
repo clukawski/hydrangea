@@ -1,0 +1,19 @@
+# cargo deny config
+
+[licenses]
+unlicensed = "warn"
+allow-osi-fsf-free = "both"
+confidence-threshold = 0.95
+allow = [
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "MIT",
+    "CC0-1.0",
+    "WTFPL"
+]
+
+[sources]
+allow-git = [
+    "https://github.com/clukawski/irc.git"
+]
