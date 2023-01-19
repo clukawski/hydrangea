@@ -75,8 +75,6 @@ pub struct List {
     pub permalink: String,
     #[serde(rename = "thumbs_up")]
     pub thumbs_up: i64,
-    #[serde(rename = "sound_urls")]
-    pub sound_urls: Vec<String>,
     pub author: String,
     pub word: String,
     pub defid: i64,
