@@ -61,7 +61,6 @@ struct CBCTitle {
     headline: String,
 }
 
-const CHANNELS: &[&str] = &["#bot"];
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Root {
@@ -87,6 +86,7 @@ pub struct List {
     pub thumbs_down: i64,
 }
 
+const CHANNELS: &[&str] = &["#bot"];
 const USERNAME: &str = "hydrangea";
 const PASSWORD: &str = "yourmom";
 const NETWORK: &str = "irc.your.mom";
@@ -848,21 +848,57 @@ fn define(handle: &MessageHandle) -> std::result::Result<(), failure::Error> {
         );
         let resp: Root = reqwest::blocking::get(&query)?.json::<Root>()?;
         if resp.list.len() > 0 {
-            client.send_notice(
-                channel,
+            send_notice_for_shivarm_s_broken_irc_server(
+                handle,
                 format!(
                     "define: {}: {}",
                     define_strings[1].trim(),
                     &resp.list[0].definition.trim()
                 ),
+                channel.to_string(),
             )?;
         } else {
-            client.send_notice(
-                channel,
+            send_notice_for_shivarm_s_broken_irc_server(
+                handle,
                 format!("define: found nothing for {}", define_strings[1]),
+                channel.to_string(),
             )?;
         }
     }
+    Ok(())
+}
+
+// Handle broken Go IRCv3 server implementation
+//
+// other servers work fine with this, such as
+// - PeeIRCd
+// - balls-chat-ng
+// - forthIRC69 (IRCv69 impl)
+const SHIVARAM_BROKEN_NOTICE_NUM_CHARS: usize = 400;
+
+// Split up strings that are too long for a particular ircv3 server implementation
+// and send multiple notices since the server can't handle splitting a string itself
+fn send_notice_for_shivarm_s_broken_irc_server(
+    handle: &MessageHandle,
+    message: String,
+    channel: String,
+) -> std::result::Result<(), failure::Error> {
+    let client = &handle.client;
+
+    if message.len() < SHIVARAM_BROKEN_NOTICE_NUM_CHARS {
+        let c = channel.clone();
+        let m = message.clone();
+        client.send_notice(c, m)?;
+    }
+
+    if message.len() >= SHIVARAM_BROKEN_NOTICE_NUM_CHARS {
+        let strings: (&str, &str) = message.split_at(SHIVARAM_BROKEN_NOTICE_NUM_CHARS);
+        let c = channel.clone();
+        client.send_notice(c, strings.0.to_string())?;
+        let c = channel.clone();
+        client.send_notice(c, strings.1.to_string())?;
+    }
+
     Ok(())
 }
 
